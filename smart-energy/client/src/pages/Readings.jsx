@@ -10,12 +10,23 @@ const schema = yup.object({
 });
 
 export default function Readings() {
+  const [households, setHouseholds] = useState([]);
+  const [householdId, setHouseholdId] = useState('');
   const [meters, setMeters] = useState([]);
   const { register, handleSubmit, setError, reset, formState: { errors, isSubmitting } } = useForm({ defaultValues: { recordedAt: new Date().toISOString().slice(0,16) } });
 
   useEffect(() => {
-    api.get('/meters').then((r) => setMeters(r.data.meters || []));
+    api.get('/households/mine').then((r) => {
+      const hs = r.data.households || [];
+      setHouseholds(hs);
+      if (hs[0]) setHouseholdId(hs[0]._id);
+    });
   }, []);
+
+  useEffect(() => {
+    if (!householdId) return;
+    api.get('/meters', { params: { householdId } }).then((r) => setMeters(r.data.meters || []));
+  }, [householdId]);
 
   async function onSubmit(values) {
     try {
@@ -36,25 +47,35 @@ export default function Readings() {
   return (
     <div className="card">
       <h3>Add Reading</h3>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <label>Meter</label>
-        <select {...register('meterId')}>
-          <option value="">Select</option>
-          {meters.map((m) => <option key={m._id} value={m._id}>{m.label} ({m.unit})</option>)}
+      <div>
+        <label>Household</label>
+        <select value={householdId} onChange={(e) => setHouseholdId(e.target.value)}>
+          {households.map((h) => <option key={h._id} value={h._id}>{h.name}</option>)}
         </select>
-        {errors.meterId && <div className="error">{errors.meterId.message}</div>}
+      </div>
+      {meters.length === 0 ? (
+        <div className="muted" style={{ marginTop: 12 }}>No meters in this household. Create one first.</div>
+      ) : (
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <label>Meter</label>
+          <select {...register('meterId')}>
+            <option value="">Select</option>
+            {meters.map((m) => <option key={m._id} value={m._id}>{m.label} ({m.unit})</option>)}
+          </select>
+          {errors.meterId && <div className="error">{errors.meterId.message}</div>}
 
-        <label>Value</label>
-        <input type="number" step="0.0001" {...register('value')} />
-        {errors.value && <div className="error">{errors.value.message}</div>}
+          <label>Value</label>
+          <input type="number" step="0.0001" {...register('value')} />
+          {errors.value && <div className="error">{errors.value.message}</div>}
 
-        <label>Recorded At</label>
-        <input type="datetime-local" {...register('recordedAt')} />
-        {errors.recordedAt && <div className="error">{errors.recordedAt.message}</div>}
+          <label>Recorded At</label>
+          <input type="datetime-local" {...register('recordedAt')} />
+          {errors.recordedAt && <div className="error">{errors.recordedAt.message}</div>}
 
-        {errors.root && <div className="error">{errors.root.message}</div>}
-        <button disabled={isSubmitting}>Add</button>
-      </form>
+          {errors.root && <div className="error">{errors.root.message}</div>}
+          <button disabled={isSubmitting}>Add</button>
+        </form>
+      )}
     </div>
   );
 }

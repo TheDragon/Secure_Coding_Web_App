@@ -19,12 +19,20 @@ export const resetValidator = [
   body('password').isLength({ min: 8 }).withMessage('Min 8 chars'),
 ];
 
-export const householdCreateValidator = [body('name').notEmpty().withMessage('Name required')]; // [REQ:Validation:presence]
+export const householdCreateValidator = [
+  body('name').notEmpty().withMessage('Name required'), // [REQ:Validation:presence]
+  body('contactEmail').isEmail().withMessage('Valid contact email required'), // [REQ:Validation:format]
+];
 
 export const meterCreateValidator = [
   body('householdId').isMongoId().withMessage('householdId required'),
   body('type').isIn(['electricity', 'water']).withMessage('Invalid type'),
   body('unit').isIn(['kWh', 'L']).withMessage('Invalid unit'),
+  body('unit').custom((val, { req }) => {
+    if (req.body.type === 'electricity') return val === 'kWh';
+    if (req.body.type === 'water') return val === 'L';
+    return false;
+  }).withMessage('Unit must match type (electricity=kWh, water=L)'), // [REQ:Validation:format]
   body('label').notEmpty().withMessage('Label required'),
 ];
 

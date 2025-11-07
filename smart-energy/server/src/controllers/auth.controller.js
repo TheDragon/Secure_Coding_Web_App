@@ -6,6 +6,7 @@ import PasswordResetToken from '../models/PasswordResetToken.js';
 import env from '../config/env.js';
 import logger from '../config/logger.js';
 import { sanitizeString } from '../middleware/sanitize.js';
+import { sendMail } from '../utils/mail.js';
 
 function signToken(user) {
   const payload = { sub: user._id.toString(), role: user.role };
@@ -19,6 +20,13 @@ export async function register(req, res, next) {
     if (exists) return res.status(409).json({ message: 'Username or email already in use.' }); // [REQ:Validation:uniqueness]
     const user = await User.create({ username, email, passwordHash: password }); // [REQ:Validation:*]
     const token = signToken(user);
+    try {
+      await sendMail({
+        to: user.email,
+        subject: 'Welcome to Smart Energy',
+        text: `Hi ${user.username}, welcome to Smart Energy!`,
+      });
+    } catch (_) {}
     res.status(201).json({ token, user });
   } catch (e) {
     logger.warn('Register failed', { error: e.message });
@@ -44,13 +52,31 @@ export async function forgotPassword(req, res, next) {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.json({ message: 'If that account exists, email sent.' }); // [REQ:Errors:userFriendly]
+    if (!user) return res.status(404).json({ message: 'No account found for that email.' }); // [REQ:Errors:userFriendly]
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date(Date.now() + env.RESET_TOKEN_EXPIRES_MIN * 60 * 1000);
     await PasswordResetToken.deleteMany({ userId: user._id });
     await PasswordResetToken.create({ userId: user._id, tokenHash, expiresAt }); // [REQ:Auth:passwordRecovery]
-    // Normally send email; include token
+    try {
+      const resetLink = `http://localhost:${env.PORT}/api/auth/reset?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
+      await sendMail({
+        to: email,
+        subject: 'Smart Energy Password Reset',
+        text: `We received a request to reset your password.
+
+If you initiated this, use the token below to reset your password in the app:
+
+Token: ${token}
+
+Alternatively, open this link: ${resetLink}
+
+If you did not request this, please ignore this email.`,
+      });
+    } catch (mailErr) {
+      logger.error('Failed to send reset email', { error: mailErr.message });
+      return res.status(500).json({ message: 'Unable to send reset email.' });
+    }
     logger.info('Password reset token created');
     res.json({ message: 'Password reset instructions sent.' });
   } catch (e) {

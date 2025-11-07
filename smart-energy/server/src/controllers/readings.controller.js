@@ -29,7 +29,7 @@ export async function createReading(req, res, next) {
           ]);
           const total = agg[0]?.total || 0;
           if (total > g.limit) {
-            const message = sanitizeString(`Usage ${total.toFixed(2)} exceeded ${g.limit} for ${g.period}`); // [REQ:XSS:validate]
+            const message = sanitizeString(`Usage ${total.toFixed(2)} ${m.type === 'electricity' ? 'kWh' : 'L'} exceeded ${g.limit} for ${g.period} (${g.meterType}).`); // [REQ:XSS:validate]
             await Alert.findOneAndUpdate(
               { goalId: g._id, periodStart: start, periodEnd: end },
               { $setOnInsert: { householdId: m.householdId }, $set: { status: 'open', message } },

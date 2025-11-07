@@ -14,7 +14,7 @@ const meterSchema = yup.object({
 export default function Household() {
   const [households, setHouseholds] = useState([]);
   const { register, handleSubmit, setError, reset, formState: { errors, isSubmitting } } = useForm();
-  const { register: registerMeter, handleSubmit: handleSubmitMeter, setError: setMeterError, reset: resetMeter, formState: { errors: meterErrors, isSubmitting: isSubmittingMeter } } = useForm();
+  const { register: registerMeter, handleSubmit: handleSubmitMeter, setError: setMeterError, reset: resetMeter, watch: watchMeter, setValue: setMeterValue, formState: { errors: meterErrors, isSubmitting: isSubmittingMeter } } = useForm({ defaultValues: { type: 'electricity', unit: 'kWh' } });
 
   async function load() {
     const r = await api.get('/households/mine');
@@ -23,24 +23,12 @@ export default function Household() {
 
   useEffect(() => { load(); }, []);
 
-  async function addDefaultMeters(household) {
-    try {
-      const defs = [
-        { householdId: household._id, type: 'electricity', unit: 'kWh', label: 'Main Electricity' },
-        { householdId: household._id, type: 'water', unit: 'L', label: 'Main Water' },
-      ];
-      const results = await Promise.allSettled(defs.map((d) => api.post('/meters', d)));
-      const failures = results.filter((r) => r.status === 'rejected');
-      if (failures.length === 0) {
-        alert('Default meters added.');
-      } else {
-        const msg = failures.map((f) => f.reason?.message || 'Failed').join('; ');
-        alert('Some meters may already exist or failed: ' + msg); // [REQ:Errors:userFriendly]
-      }
-    } catch (e) {
-      alert('Unable to add default meters: ' + (e.message || 'Error'));
-    }
-  }
+  // Sync unit with type to avoid invalid combos
+  const meterType = watchMeter('type');
+  useEffect(() => {
+    if (meterType === 'electricity') setMeterValue('unit', 'kWh');
+    if (meterType === 'water') setMeterValue('unit', 'L');
+  }, [meterType, setMeterValue]);
 
   async function onSubmit(values) {
     try { await schema.validate(values, { abortEarly: false }); } catch (e) { e.inner?.forEach((x) => setError(x.path, { message: x.message })); return; }
@@ -79,6 +67,10 @@ export default function Household() {
           <label>Address</label>
           <input {...register('address')} />
 
+          <label>Contact Email</label>
+          <input type="email" {...register('contactEmail')} />
+          {errors.contactEmail && <div className="error">{errors.contactEmail.message}</div>}
+
           {errors.root && <div className="error">{errors.root.message}</div>}
           <button disabled={isSubmitting}>Save</button>
         </form>
@@ -87,10 +79,7 @@ export default function Household() {
         <h3>My Households</h3>
         <ul>
           {households.map((h) => (
-            <li key={h._id} style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>{h.name}</span>
-              <button onClick={() => addDefaultMeters(h)}>Add Default Meters</button>
-            </li>
+            <li key={h._id}>{h.name}</li>
           ))}
         </ul>
       </div>
@@ -105,16 +94,16 @@ export default function Household() {
           {meterErrors.householdId && <div className="error">{meterErrors.householdId.message}</div>}
 
           <label>Type</label>
-          <select {...registerMeter('type')} defaultValue="electricity">
+          <select {...registerMeter('type')}>
             <option value="electricity">Electricity</option>
             <option value="water">Water</option>
           </select>
           {meterErrors.type && <div className="error">{meterErrors.type.message}</div>}
 
           <label>Unit</label>
-          <select {...registerMeter('unit')} defaultValue="kWh">
-            <option value="kWh">kWh</option>
-            <option value="L">L</option>
+          <select {...registerMeter('unit')} disabled>
+            {meterType === 'electricity' && <option value="kWh">kWh</option>}
+            {meterType === 'water' && <option value="L">L</option>}
           </select>
           {meterErrors.unit && <div className="error">{meterErrors.unit.message}</div>}
 

@@ -1,5 +1,7 @@
 import Alert from '../models/Alert.js';
 import Goal from '../models/Goal.js';
+import Household from '../models/Household.js';
+import { sendMail } from '../utils/mail.js';
 import { isMemberOfHousehold } from '../utils/permissions.js';
 
 export async function listAlerts(req, res, next) {
@@ -21,6 +23,21 @@ export async function acknowledgeAlert(req, res, next) {
     const member = req.user?.role === 'admin' || (await isMemberOfHousehold(req.user.id, existing.householdId));
     if (!member) return res.status(403).json({ message: 'Forbidden' }); // [REQ:Auth:permissionCheck]
     const a = await Alert.findByIdAndUpdate(existing._id, { status: 'acknowledged' }, { new: true });
+    try {
+      const h = await Household.findById(existing.householdId).lean();
+      const to = h?.contactEmail;
+      if (to) {
+        await sendMail({
+          to,
+          subject: 'Smart Energy Alert Acknowledged',
+          text: `An alert was acknowledged for household "${h.name}". Warning: Your usage exceeded a configured goal.
+
+Details: ${existing.message || ''}
+
+Please review your consumption and goals.`,
+        });
+      }
+    } catch (_) {}
     if (!a) return res.status(404).json({ message: 'Alert not found.' });
     res.json({ alert: a });
   } catch (e) {

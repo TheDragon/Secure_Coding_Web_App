@@ -1,10 +1,18 @@
 import Household from '../models/Household.js';
 import User from '../models/User.js';
+import { sendMail } from '../utils/mail.js';
 
 export async function createHousehold(req, res, next) {
   try {
-    const { name, address } = req.body;
-    const doc = await Household.create({ name, address, owner: req.user.id }); // [REQ:Validation:presence]
+    const { name, address, contactEmail } = req.body;
+    const doc = await Household.create({ name, address, contactEmail, owner: req.user.id }); // [REQ:Validation:presence]
+    try {
+      await sendMail({
+        to: contactEmail,
+        subject: 'Welcome to Smart Energy Household',
+        text: `Your household "${name}" has been created. Start adding meters and readings!`,
+      });
+    } catch (_) {}
     res.status(201).json({ household: doc });
   } catch (e) {
     next({ status: 400, message: 'Unable to create household.' }); // [REQ:Errors:userFriendly]

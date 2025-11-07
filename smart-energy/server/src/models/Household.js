@@ -4,6 +4,7 @@ import { sanitizeString } from '../middleware/sanitize.js';
 const householdSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true }, // [REQ:Validation:presence]
+    contactEmail: { type: String, required: true, trim: true, lowercase: true, match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ }, // [REQ:Validation:format]
     address: {
       type: String,
       set: (v) => (typeof v === 'string' ? sanitizeString(v) : v), // [REQ:XSS:validate]
