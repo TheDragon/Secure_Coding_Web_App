@@ -2,11 +2,6 @@ import nodemailer from "nodemailer";
 import logger from "../config/logger.js";
 
 // Hardcoded SMTP credentials (fill these in before running)
-const SMTP_HOST = "smtp.gmail.com";
-const SMTP_PORT = 465; // 465 for SSL, 587 for STARTTLS
-const SMTP_SECURE = true; // false if using 587
-const SMTP_USER = "sonamchopheld@gmail.com"; // e.g., 'sonamchopheld@gmail.com'
-const SMTP_PASS = "jcpm ggtj loeu kkwf"; // e.g., Gmail App Password
 
 let transporter;
 function getTransporter() {
