@@ -1,0 +1,13 @@
+openapi: 3.0.0
+info:
+  title: Smart Energy API
+  version: 1.0.0
+servers:
+  - url: http://localhost:7000/api
+paths:
+  /health:
+    get:
+      summary: Healthcheck
+      responses:
+        '200':
+          description: OK
