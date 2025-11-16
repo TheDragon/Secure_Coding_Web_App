@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import api from '../api/http.js';
 import FormField from '../components/FormField.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const schema = yup.object({
   email: yup.string().email('Valid email required').required('Email required'),
@@ -10,6 +11,7 @@ const schema = yup.object({
 });
 
 export default function Login() {
+  const { setAuthState } = useAuth();
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm();
 
   async function onSubmit(values) {
@@ -21,8 +23,7 @@ export default function Login() {
     }
     try {
       const r = await api.post('/auth/login', values);
-      localStorage.setItem('token', r.data.token);
-      localStorage.setItem('role', r.data.user.role);
+      setAuthState({ token: r.data.token, user: r.data.user });
       window.location.hash = '#/dashboard';
     } catch (e) {
       setError('root', { message: e.message });
@@ -38,7 +39,7 @@ export default function Login() {
         {errors.root && <div className="error">{errors.root.message}</div>}
         <button disabled={isSubmitting}>Login</button>
       </form>
-      <div className="muted"><a href="#/forgot">Forgot password?</a> or <a href="#/register">Register</a></div>
+      <div className="muted"><a href="#/forgot">Forgot password?</a></div>
     </div>
   );
 }

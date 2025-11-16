@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createMeter, listMeters, deleteMeter } from '../controllers/meters.controller.js';
 import { meterCreateValidator } from '../utils/validators.js';
 import { validateRequest } from '../middleware/validate.js';
 
 const router = Router();
 
-router.post('/', requireAuth, meterCreateValidator, validateRequest, createMeter);
+router.post('/', requireAuth, requireRole('admin'), meterCreateValidator, validateRequest, createMeter);
 router.get('/', requireAuth, listMeters);
-router.delete('/:id', requireAuth, deleteMeter);
+router.delete('/:id', requireAuth, requireRole('admin'), deleteMeter);
 
 export default router;

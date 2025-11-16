@@ -15,7 +15,8 @@ export default function Goals() {
   const [householdId, setHouseholdId] = useState('');
   const [goals, setGoals] = useState([]);
   const [meters, setMeters] = useState([]);
-  const { register, handleSubmit, setError, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm();
+  const [editingGoal, setEditingGoal] = useState(null);
+  const { register, handleSubmit, setError, reset, setValue, formState: { errors, isSubmitting } } = useForm();
 
   useEffect(() => {
     api.get('/households/mine').then((r) => {
@@ -47,12 +48,26 @@ export default function Goals() {
       return;
     }
     try {
-      await api.post('/goals', values);
+      if (editingGoal) {
+        await api.patch(`/goals/${editingGoal._id}`, values);
+      } else {
+        await api.post('/goals', values);
+      }
       reset();
+      setValue('householdId', householdId);
+      setEditingGoal(null);
       await loadHouseholdContext(values.householdId);
     } catch (e) {
       setError('root', { message: e.message }); // [REQ:Errors:userFriendly]
     }
+  }
+
+  function startEdit(goal) {
+    setEditingGoal(goal);
+    setValue('householdId', householdId);
+    setValue('meterType', goal.meterType);
+    setValue('period', goal.period);
+    setValue('limit', goal.limit);
   }
 
   return (
@@ -96,7 +111,21 @@ export default function Goals() {
             {errors.limit && <div className="error">{errors.limit.message}</div>}
 
             {errors.root && <div className="error">{errors.root.message}</div>}
-            <button disabled={isSubmitting}>Save</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button disabled={isSubmitting}>{editingGoal ? 'Update Goal' : 'Save'}</button>
+              {editingGoal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    reset();
+                    setEditingGoal(null);
+                    setValue('householdId', householdId);
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
         )}
       </div>
@@ -105,7 +134,10 @@ export default function Goals() {
         <h3>Existing Goals</h3>
         <ul>
           {goals.map((g) => (
-            <li key={g._id}>{g.period} {g.meterType} limit: {g.limit}</li>
+            <li key={g._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <span>{g.period} {g.meterType} limit: {g.limit}</span>
+              <button type="button" onClick={() => startEdit(g)}>Edit</button>
+            </li>
           ))}
         </ul>
       </div>

@@ -5,7 +5,7 @@ import { isMemberOfHousehold } from '../utils/permissions.js';
 export async function createMeter(req, res, next) {
   try {
     const { householdId, type, unit, label } = req.body;
-    const hh = await Household.findById(householdId).lean();
+    const hh = await Household.findById(householdId).lean({ getters: true });
     if (!hh) return res.status(404).json({ message: 'Household not found.' });
     if (hh.owner?.toString() !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
     const exists = await Meter.findOne({ householdId, label }); // [REQ:Validation:uniqueness]

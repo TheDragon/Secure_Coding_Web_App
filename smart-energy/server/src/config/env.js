@@ -21,6 +21,7 @@ const env = {
   RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS || 900000,
   RATE_LIMIT_MAX: process.env.RATE_LIMIT_MAX || 150,
   REFRESH_TOKEN_EXPIRES_DAYS: Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 7),
+  DATA_ENCRYPTION_KEY: process.env.DATA_ENCRYPTION_KEY,
 };
 
 export default env;

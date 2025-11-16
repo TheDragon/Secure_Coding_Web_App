@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAccessToken, setAccessToken, clearAccessToken } from '../context/tokenStore.js';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:7000/api',
@@ -6,7 +7,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = getAccessToken();
   if (token) config.headers.Authorization = `Bearer ${token}`; // [REQ:Auth:jwtRoleSession]
   return config;
 });
@@ -26,16 +27,15 @@ api.interceptors.response.use(
         refreshPromise = null;
         const { token, user } = resp.data || {};
         if (token) {
-          localStorage.setItem('token', token);
-          if (user?.role) localStorage.setItem('role', user.role);
+          setAccessToken(token);
           originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers.Authorization = `Bearer ${token}`;
           return api(originalRequest);
         }
       } catch (refreshErr) {
         refreshPromise = null;
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
+        clearAccessToken();
+        window.dispatchEvent(new CustomEvent('auth:logout'));
         window.location.hash = '#/login';
         return Promise.reject(refreshErr);
       }

@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+import env from '../config/env.js';
 import Household from '../models/Household.js';
 import User from '../models/User.js';
 import Meter from '../models/Meter.js';
@@ -6,26 +8,87 @@ import Alert from '../models/Alert.js';
 import Reading from '../models/Reading.js';
 import { sendMail } from '../utils/mail.js';
 
+const APP_URL = env.CORS_ORIGIN || 'http://localhost:5173';
+
+function generateStrongPassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const special = '!@#$%^&*';
+  const all = upper + lower + digits + special;
+  const pick = (set) => set[Math.floor(Math.random() * set.length)];
+  const chars = [pick(upper), pick(lower), pick(digits), pick(special)];
+  while (chars.length < 12) {
+    chars.push(all[Math.floor(Math.random() * all.length)]);
+  }
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+
+async function buildUsername(baseEmail) {
+  const local = baseEmail.split('@')[0];
+  let base = local.replace(/[^a-z0-9._-]/gi, '').toLowerCase();
+  if (!base) base = `user${crypto.randomInt(1000, 9999)}`;
+  let username = base;
+  let counter = 1;
+  while (await User.findOne({ username })) {
+    username = `${base}${counter++}`;
+  }
+  return username;
+}
+
 export async function createHousehold(req, res, next) {
   try {
-    const { name, address, contactEmail } = req.body;
-    const doc = await Household.create({ name, address, contactEmail, owner: req.user.id }); // [REQ:Validation:presence]
+    const { name, address, residentEmail, residentName } = req.body;
+    if (!residentEmail || !residentName) {
+      return res.status(400).json({ message: 'Resident name and email are required.' });
+    }
+    const emailLower = residentEmail.toLowerCase();
+    const existing = await User.findOne({ email: emailLower });
+    if (existing) {
+      return res.status(409).json({ message: 'Resident email already registered.' });
+    }
+    const username = await buildUsername(emailLower);
+    const password = generateStrongPassword();
+    const newUser = await User.create({
+      username,
+      email: emailLower,
+      passwordHash: password,
+      role: 'user',
+    });
+    const tempCredentials = { username, password, email: emailLower, residentName };
+
+    const doc = await Household.create({
+      name,
+      address,
+      contactEmail: emailLower,
+      owner: newUser._id,
+      members: [req.user.id],
+    }); // [REQ:Validation:presence]
+
     try {
       await sendMail({
-        to: contactEmail,
+        to: tempCredentials.email,
         subject: 'Welcome to Smart Energy Household',
-        text: `Your household "${name}" has been created. Start adding meters and readings!`,
+        text: `Hi ${tempCredentials.residentName},\n\nYour household "${name}" has been created for you.\n\nUsername: ${tempCredentials.username}\nTemporary Password: ${tempCredentials.password}\nLogin: ${APP_URL}\n\nPlease sign in and use the Forgot Password option to set your own password.`,
       });
     } catch (_) {}
     res.status(201).json({ household: doc });
   } catch (e) {
-    next({ status: 400, message: 'Unable to create household.' }); // [REQ:Errors:userFriendly]
+    next({ status: 400, message: e.message || 'Unable to create household.' }); // [REQ:Errors:userFriendly]
   }
 }
 
 export async function getMine(req, res, next) {
   try {
-    const households = await Household.find({ $or: [{ owner: req.user.id }, { members: req.user.id }] }).lean(); // [REQ:NoSQLi:parameterized]
+    if (req.user.role === 'admin') {
+      const households = await Household.find().lean({ getters: true });
+      return res.json({ households });
+    }
+    const households = await Household.find({ $or: [{ owner: req.user.id }, { members: req.user.id }] }).lean({ getters: true }); // [REQ:NoSQLi:parameterized]
     res.json({ households });
   } catch (e) {
     next({ status: 500, message: 'Unable to fetch households.' });
@@ -34,7 +97,7 @@ export async function getMine(req, res, next) {
 
 export async function getById(req, res, next) {
   try {
-    const h = await Household.findById(req.params.id).lean();
+    const h = await Household.findById(req.params.id).lean({ getters: true });
     if (!h) return res.status(404).json({ message: 'Household not found.' });
     const isMember = h.owner?.toString() === req.user.id || (h.members || []).some((m) => String(m) === req.user.id);
     if (!isMember && req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' }); // [REQ:Auth:permissionCheck]

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import api from '../api/http.js';
@@ -9,11 +9,20 @@ const schema = yup.object({
   recordedAt: yup.date().required('Date required'),
 });
 
+function formatLocalDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+}
+
 export default function Readings() {
   const [households, setHouseholds] = useState([]);
   const [householdId, setHouseholdId] = useState('');
   const [meters, setMeters] = useState([]);
-  const { register, handleSubmit, setError, reset, formState: { errors, isSubmitting } } = useForm({ defaultValues: { recordedAt: new Date().toISOString().slice(0,16) } });
+  const [readings, setReadings] = useState([]);
+  const [editingReading, setEditingReading] = useState(null);
+  const { register, handleSubmit, setError, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm({ defaultValues: { recordedAt: new Date().toISOString().slice(0,16) } });
 
   useEffect(() => {
     api.get('/households/mine').then((r) => {
@@ -28,6 +37,22 @@ export default function Readings() {
     api.get('/meters', { params: { householdId } }).then((r) => setMeters(r.data.meters || []));
   }, [householdId]);
 
+  const selectedMeterId = watch('meterId');
+
+  useEffect(() => {
+    if (!selectedMeterId) {
+      setReadings([]);
+      setEditingReading(null);
+      return;
+    }
+    loadReadings(selectedMeterId);
+  }, [selectedMeterId]);
+
+  async function loadReadings(meterId) {
+    const res = await api.get(`/readings/by-meter/${meterId}?limit=20`);
+    setReadings(res.data.readings || []);
+  }
+
   async function onSubmit(values) {
     try {
       await schema.validate(values, { abortEarly: false });
@@ -36,9 +61,15 @@ export default function Readings() {
       return;
     }
     try {
-      await api.post('/readings', { ...values, recordedAt: new Date(values.recordedAt).toISOString() });
-      reset();
-      alert('Reading added');
+      const payload = { ...values, recordedAt: new Date(values.recordedAt).toISOString() };
+      if (editingReading) {
+        await api.patch(`/readings/${editingReading._id}`, payload);
+      } else {
+        await api.post('/readings', payload);
+      }
+      reset({ meterId: values.meterId, value: '', recordedAt: new Date().toISOString().slice(0,16) });
+      setEditingReading(null);
+      await loadReadings(values.meterId);
     } catch (e) {
       setError('root', { message: e.message }); // [REQ:Errors:userFriendly]
     }
@@ -73,8 +104,44 @@ export default function Readings() {
           {errors.recordedAt && <div className="error">{errors.recordedAt.message}</div>}
 
           {errors.root && <div className="error">{errors.root.message}</div>}
-          <button disabled={isSubmitting}>Add</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button disabled={isSubmitting}>{editingReading ? 'Update Reading' : 'Add'}</button>
+            {editingReading && (
+              <button type="button" onClick={() => {
+                setEditingReading(null);
+                reset({ meterId: selectedMeterId, value: '', recordedAt: new Date().toISOString().slice(0,16) });
+              }}>Cancel</button>
+            )}
+          </div>
         </form>
+      )}
+      {selectedMeterId && readings.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h4>Recent Readings</h4>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th align="left">Value</th>
+                <th align="left">Recorded At</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {readings.map((r) => (
+                <tr key={r._id}>
+                  <td>{r.value}</td>
+                  <td>{new Date(r.recordedAt).toLocaleString()}</td>
+                  <td><button type="button" onClick={() => {
+                    setEditingReading(r);
+                    setValue('meterId', r.meterId);
+                    setValue('value', r.value);
+                    setValue('recordedAt', formatLocalDate(r.recordedAt));
+                  }}>Edit</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

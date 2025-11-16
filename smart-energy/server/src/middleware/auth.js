@@ -36,7 +36,7 @@ export async function requireHouseholdMember(req, res, next) {
   try {
     const householdId = req.params.id || req.body.householdId;
     if (!householdId) return res.status(400).json({ message: 'Household id required.' });
-    const h = await Household.findById(householdId).lean(); // [REQ:NoSQLi:parameterized]
+    const h = await Household.findById(householdId).lean({ getters: true }); // [REQ:NoSQLi:parameterized]
     if (!h) return res.status(404).json({ message: 'Household not found.' });
     const isMember = h.owner?.toString() === req.user.id || (h.members || []).some((m) => String(m) === req.user.id);
     if (!isMember && req.user.role !== 'admin') {

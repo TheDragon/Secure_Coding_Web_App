@@ -21,7 +21,9 @@ export const resetValidator = [
 
 export const householdCreateValidator = [
   body('name').notEmpty().withMessage('Name required'), // [REQ:Validation:presence]
-  body('contactEmail').isEmail().withMessage('Valid contact email required'), // [REQ:Validation:format]
+  body('contactEmail').optional().isEmail().withMessage('Valid contact email required'),
+  body('residentEmail').isEmail().withMessage('Valid resident email required'),
+  body('residentName').isLength({ min: 2 }).withMessage('Resident name required'),
 ];
 
 export const householdUpdateValidator = [
@@ -47,6 +49,12 @@ export const readingCreateValidator = [
   body('recordedAt').isISO8601().withMessage('Invalid date'),
 ];
 
+export const readingUpdateValidator = [
+  body('value').optional().isFloat({ min: 0 }).withMessage('Value must be >= 0'),
+  body('recordedAt').optional().isISO8601().withMessage('Invalid date'),
+  body('notes').optional().isLength({ max: 2000 }),
+];
+
 export const readingsQueryValidator = [
   param('meterId').isMongoId().withMessage('meterId required'),
   query('from').optional().isISO8601().withMessage('Invalid from date'),
@@ -63,3 +71,4 @@ export const goalValidator = [
 ];
 
 export const alertAckValidator = [body('status').isIn(['acknowledged']).withMessage('Invalid status')];
+

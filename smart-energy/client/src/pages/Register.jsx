@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import api from '../api/http.js';
 import FormField from '../components/FormField.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const schema = yup.object({
   username: yup.string().required('Username required').min(3).max(32).matches(/^[a-z0-9._-]+$/, 'Invalid format'), // [REQ:Validation:presence] [REQ:Validation:range] [REQ:Validation:format]
@@ -11,6 +12,7 @@ const schema = yup.object({
 });
 
 export default function Register() {
+  const { setAuthState } = useAuth();
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm();
 
   async function onSubmit(values) {
@@ -22,8 +24,7 @@ export default function Register() {
     }
     try {
       const r = await api.post('/auth/register', values);
-      localStorage.setItem('token', r.data.token);
-      localStorage.setItem('role', r.data.user.role);
+      setAuthState({ token: r.data.token, user: r.data.user });
       window.location.hash = '#/dashboard';
     } catch (e) {
       setError('root', { message: e.message });

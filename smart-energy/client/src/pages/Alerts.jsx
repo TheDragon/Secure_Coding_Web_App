@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api/http.js';
 import DOMPurify from 'dompurify';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Alerts() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [alerts, setAlerts] = useState([]);
   const [households, setHouseholds] = useState([]);
   const [householdId, setHouseholdId] = useState('');
@@ -25,6 +28,11 @@ export default function Alerts() {
     setAlerts((prev) => prev.map((a) => (a._id === id ? { ...a, status: 'acknowledged' } : a)));
   }
 
+  const visibleAlerts = useMemo(() => {
+    if (isAdmin) return alerts;
+    return alerts.filter((a) => a.status === 'acknowledged');
+  }, [alerts, isAdmin]);
+
   return (
     <div className="card">
       <h3>Alerts</h3>
@@ -32,12 +40,13 @@ export default function Alerts() {
       <select value={householdId} onChange={(e) => setHouseholdId(e.target.value)}>
         {households.map((h) => <option key={h._id} value={h._id}>{h.name}</option>)}
       </select>
+      {!isAdmin && <div className="muted">Alerts appear here once an administrator acknowledges them.</div>}
       <ul>
-        {alerts.map((a) => (
+        {visibleAlerts.map((a) => (
           <li key={a._id}>
             <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(a.message || '') }} /> {/* [REQ:Sanitization:output] [REQ:XSS:encode] */}
             {' '}({a.status}){' '}
-            {a.status !== 'acknowledged' && <button onClick={() => ack(a._id)}>Acknowledge</button>}
+            {isAdmin && a.status !== 'acknowledged' && <button onClick={() => ack(a._id)}>Acknowledge</button>}
           </li>
         ))}
       </ul>
