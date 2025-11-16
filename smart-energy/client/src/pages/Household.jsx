@@ -3,7 +3,10 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import api from '../api/http.js';
 
-const schema = yup.object({ name: yup.string().required('Name required') }); // [REQ:Validation:presence]
+const schema = yup.object({
+  name: yup.string().required('Name required'), // [REQ:Validation:presence]
+  contactEmail: yup.string().email('Valid email required').required('Contact email required'),
+});
 const meterSchema = yup.object({
   householdId: yup.string().required('Household required'), // [REQ:Validation:presence]
   type: yup.string().oneOf(['electricity', 'water']).required('Type required'), // [REQ:Validation:presence]
@@ -79,7 +82,23 @@ export default function Household() {
         <h3>My Households</h3>
         <ul>
           {households.map((h) => (
-            <li key={h._id}>{h.name}</li>
+            <li key={h._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <span>{h.name}</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm('Delete this household?')) return;
+                  try {
+                    await api.delete(`/households/${h._id}`);
+                    await load();
+                  } catch (err) {
+                    alert(err.message);
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </li>
           ))}
         </ul>
       </div>

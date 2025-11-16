@@ -24,6 +24,11 @@ export const householdCreateValidator = [
   body('contactEmail').isEmail().withMessage('Valid contact email required'), // [REQ:Validation:format]
 ];
 
+export const householdUpdateValidator = [
+  body('name').optional().notEmpty().withMessage('Name required'),
+  body('contactEmail').optional().isEmail().withMessage('Valid contact email required'),
+];
+
 export const meterCreateValidator = [
   body('householdId').isMongoId().withMessage('householdId required'),
   body('type').isIn(['electricity', 'water']).withMessage('Invalid type'),

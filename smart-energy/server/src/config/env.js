@@ -20,6 +20,7 @@ const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
   RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS || 900000,
   RATE_LIMIT_MAX: process.env.RATE_LIMIT_MAX || 150,
+  REFRESH_TOKEN_EXPIRES_DAYS: Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 7),
 };
 
 export default env;

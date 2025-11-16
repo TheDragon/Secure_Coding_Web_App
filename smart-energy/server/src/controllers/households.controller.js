@@ -1,5 +1,9 @@
 import Household from '../models/Household.js';
 import User from '../models/User.js';
+import Meter from '../models/Meter.js';
+import Goal from '../models/Goal.js';
+import Alert from '../models/Alert.js';
+import Reading from '../models/Reading.js';
 import { sendMail } from '../utils/mail.js';
 
 export async function createHousehold(req, res, next) {
@@ -47,6 +51,7 @@ export async function updateHousehold(req, res, next) {
     if (String(h.owner) !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
     if (req.body.name) h.name = req.body.name;
     if (req.body.address) h.address = req.body.address; // sanitized via model setter // [REQ:XSS:validate]
+    if (req.body.contactEmail) h.contactEmail = req.body.contactEmail;
     await h.save();
     res.json({ household: h });
   } catch (e) {
@@ -83,5 +88,27 @@ export async function removeMember(req, res, next) {
     res.json({ household: h });
   } catch (e) {
     next({ status: 400, message: 'Unable to remove member.' });
+  }
+}
+
+export async function deleteHousehold(req, res, next) {
+  try {
+    const h = await Household.findById(req.params.id);
+    if (!h) return res.status(404).json({ message: 'Household not found.' });
+    if (String(h.owner) !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const meters = await Meter.find({ householdId: h._id }).select('_id');
+    const meterIds = meters.map((m) => m._id);
+    if (meterIds.length) {
+      await Reading.deleteMany({ meterId: { $in: meterIds } });
+    }
+    await Meter.deleteMany({ householdId: h._id });
+    await Goal.deleteMany({ householdId: h._id });
+    await Alert.deleteMany({ householdId: h._id });
+    await Household.deleteOne({ _id: h._id });
+    res.json({ message: 'Household deleted.' });
+  } catch (e) {
+    next({ status: 400, message: 'Unable to delete household.' });
   }
 }

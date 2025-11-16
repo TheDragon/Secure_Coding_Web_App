@@ -42,7 +42,12 @@ export default function App() {
     { href: '#/profile', label: 'Profile' },
   ]), []);
 
-  function logout() {
+  async function logout() {
+    try {
+      await api.post('/auth/logout');
+    } catch (e) {
+      // ignore
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('role');
     window.location.hash = '#/login';

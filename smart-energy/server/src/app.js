@@ -13,9 +13,13 @@ import routes from './routes/index.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { sanitizeString } from './middleware/sanitize.js';
+import { requestId } from './middleware/requestId.js';
+import { requestLogger } from './middleware/requestLogger.js';
 
 const app = express();
 
+app.use(requestId);
+app.use(requestLogger);
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(hpp()); // [REQ:NoSQLi:prevention]

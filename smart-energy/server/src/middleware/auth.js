@@ -1,14 +1,20 @@
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
-import User from '../models/User.js';
 import Household from '../models/Household.js';
+import RefreshToken from '../models/RefreshToken.js';
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   try {
     const header = req.headers.authorization || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return res.status(401).json({ message: 'Authentication required.' }); // [REQ:Auth:jwtRoleSession]
     const payload = jwt.verify(token, env.JWT_SECRET);
+    if (!payload.sid) return res.status(401).json({ message: 'Session invalid.' });
+    const session = await RefreshToken.findById(payload.sid).lean();
+    if (!session || session.revokedAt || session.expiresAt < new Date()) {
+      return res.status(401).json({ message: 'Session expired.' });
+    }
+    req.sessionId = session._id.toString();
     req.user = { id: payload.sub, role: payload.role }; // [REQ:Auth:jwtRoleSession]
     return next();
   } catch (e) {
